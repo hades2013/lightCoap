@@ -13,15 +13,23 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <net/if.h>
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
 #include "coap.h"
+#include "cJSON.h"
+
+typedef struct etherAddr 
+{
+    unsigned char octet[6];
+}etherAddr_t;
 
 int flags = 0;
 
@@ -64,6 +72,52 @@ static inline void
 set_timeout(coap_tick_t *timer, const unsigned int seconds) {
   coap_ticks(timer);
   *timer += seconds * COAP_TICKS_PER_SECOND;
+}
+
+int getnetifipaddr(const char *ifname, struct in_addr *ipaddr)
+{ 
+    int sock, ret;
+    struct ifreq ifr;
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(sock < 0){
+        return -1;
+    }
+   memset(&ifr, 0, sizeof(struct ifreq));
+    strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name) - 1);
+    ret = ioctl(sock, SIOCGIFADDR, &ifr);
+    if(!ret && ipaddr)
+    {
+        memcpy(ipaddr, &((struct sockaddr_in*)&(ifr.ifr_addr))->sin_addr, sizeof(*ipaddr));
+    }
+    close(sock);   
+  return (ret < 0) ? -1 : 0;
+}
+
+int getnetifiphwaddr(const char *ifname, etherAddr_t *hwaddr)
+{
+  int sock, ret;
+  struct ifreq ifr;
+
+  sock = socket(AF_INET, SOCK_STREAM, 0);
+  if(sock < 0) 
+    {   
+        return -1;
+    }
+
+  memset(&ifr, 0, sizeof(struct ifreq));
+  strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name) - 1);
+    
+  ret = ioctl(sock, SIOCGIFHWADDR, &ifr);
+
+  if(!ret && hwaddr)
+    {
+        memcpy(hwaddr, ifr.ifr_hwaddr.sa_data, sizeof(etherAddr_t));
+    }
+
+  close(sock);
+    
+  return (ret < 0) ? -1 : 0;
 }
 
 int
