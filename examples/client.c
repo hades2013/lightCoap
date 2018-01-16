@@ -24,7 +24,9 @@
 #include <netdb.h>
 
 #include "coap.h"
-#include "cJSON.h"
+#include "cJSON.h" 
+
+typedef cJSON cJson_t;
 
 typedef struct etherAddr 
 {
@@ -66,7 +68,10 @@ coap_tick_t max_wait;		/* global timeout (changed by set_timeout()) */
 unsigned int obs_seconds = 30;	/* default observe time */
 coap_tick_t obs_wait = 0;	/* timeout for current subscription */
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
+#define min(a,b) ((a) < (b) ? (a) : (b)) 
+
+extern int  check_segment(const unsigned char *s, size_t length);
+extern void decode_segment(const unsigned char *seg, size_t length, unsigned char *buf);
 
 static inline void
 set_timeout(coap_tick_t *timer, const unsigned int seconds) {
@@ -118,6 +123,31 @@ int getnetifiphwaddr(const char *ifname, etherAddr_t *hwaddr)
   close(sock);
     
   return (ret < 0) ? -1 : 0;
+} 
+
+
+static void create_JSONobjects(void)
+{
+	cJSON *root = NULL;
+	char buffer[512]={0}; 
+	int len;
+
+	root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "searchKey", "ANDLINK-DEVICE");
+    cJSON_AddStringToObject(root,"andlinkVersion", "V2"); 
+
+    if (cJSON_PrintPreallocated(root, buffer, sizeof(buffer), 0) != 0) {
+        cJSON_Delete(root);
+        exit(EXIT_FAILURE);
+    }
+    cJSON_Delete(root); 
+  	len = check_segment((unsigned char *)buffer, strlen(buffer));
+  	payload.s = (unsigned char *)coap_malloc(len);
+ 	if (!payload.s)
+    	return 0;
+
+  	payload.length = len;
+  	decode_segment((unsigned char *)buffer, strlen(buffer), payload.s);  
 }
 
 int
@@ -828,9 +858,6 @@ cmdline_option(char *arg) {
 					 (unsigned char *)arg), order_opts);
 }
 
-extern int  check_segment(const unsigned char *s, size_t length);
-extern void decode_segment(const unsigned char *seg, size_t length, unsigned char *buf);
-
 int
 cmdline_input(char *text, str *buf) {
   int len;
@@ -989,7 +1016,9 @@ main(int argc, char **argv) {
       break;
     case 'e' : 
       if (!cmdline_input(optarg,&payload))
-	payload.length = 0;     
+	payload.length = 0;
+
+		create_JSONobjects();   
       break;
     case 'f' :
       if (!cmdline_input_from_file(optarg,&payload))
