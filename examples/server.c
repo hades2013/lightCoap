@@ -49,6 +49,8 @@ static coap_async_state_t *async = NULL;
 #endif /* WITHOUT_ASYNC */
 
 #define HELLO "Hello world!\n"
+extern int  check_segment(const unsigned char *s, size_t length);
+extern void decode_segment(const unsigned char *seg, size_t length, unsigned char *buf);
 /* SIGINT handler: set quit to 1 for graceful termination */
 void
 handle_sigint(int signum) {
@@ -59,22 +61,39 @@ void hnd_get_searchgw(coap_context_t  *ctx, struct coap_resource_t *resource,
         coap_address_t *peer, coap_pdu_t *request, str *token,
         coap_pdu_t *response)
 {     
-  char buf[512] = {0};
+  unsigned char *buf=NULL;
+  unsigned char data[512] = {0};
+  unsigned char *de_buf;
   cJSON *root = NULL;
   cJSON *item = NULL;
+  int len;
 
   response->hdr->code = COAP_RESPONSE_CODE(205);
   if(request != NULL)
   {
     printf("get payload data: %s\n", request->data);
-    root = cJSON_Parse(request->data);
+    root = cJSON_Parse((char *)request->data);
     item = cJSON_GetObjectItem(root, "searchKey");
     if(!strncmp(item->valuestring, "ANDLINK-DEV", 11)){
       printf("item->valuestring: %s\n", item->valuestring);
       response->hdr->code = COAP_RESPONSE_CODE(205);
       coap_add_option(response, COAP_OPTION_CONTENT_FORMAT,
         coap_encode_var_bytes(buf, COAP_MEDIATYPE_TEXT_PLAIN), buf);
-      coap_add_data(response, strlen(HELLO), (unsigned char *)HELLO);
+      root = cJSON_CreateObject();
+      cJSON_AddStringToObject(root, "searchKey", "ANDLINK-GW");
+      cJSON_AddStringToObject(root,"andlinkVersion", "V2"); 
+      if (!cJSON_PrintPreallocated(root, (char *)data, sizeof(data), 0)) {
+        printf("this is error!\n");
+        cJSON_Delete(root);
+      }
+      cJSON_Delete(root); 
+      len = check_segment((unsigned char *)data, strlen(data));
+      de_buf = (unsigned char *)coap_malloc(len);
+      if(!de_buf)
+          printf("error!\n");
+      else
+      decode_segment((unsigned char *)data, strlen(data), de_buf);
+      coap_add_data(response, strlen(de_buf), de_buf);
     }
     else{
      response->hdr->code = COAP_RESPONSE_CODE(404);

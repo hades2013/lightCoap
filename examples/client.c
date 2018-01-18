@@ -137,7 +137,7 @@ static int create_JSONobjects(void)
   cJSON_AddStringToObject(root,"andlinkVersion", "V2"); 
 
   memset(buffer, 0 , sizeof(buffer));
-  if (!cJSON_PrintPreallocated(root, buffer, sizeof(buffer), 0)) {
+  if (!cJSON_PrintPreallocated(root, (char *)buffer, sizeof(buffer), 0)) {
       printf("this is error!\n");
       cJSON_Delete(root);
       return 0;
