@@ -25,7 +25,8 @@
 
 #include "config.h"
 #include "resource.h"
-#include "coap.h"
+#include "coap.h" 
+#include "cJSON.h"
 
 #define COAP_RESOURCE_CHECK_TIME 2
 
@@ -47,10 +48,39 @@ struct coap_resource_t *time_resource = NULL;
 static coap_async_state_t *async = NULL;
 #endif /* WITHOUT_ASYNC */
 
+#define HELLO "Hello world!\n"
 /* SIGINT handler: set quit to 1 for graceful termination */
 void
 handle_sigint(int signum) {
   quit = 1;
+}
+
+void hnd_get_searchgw(coap_context_t  *ctx, struct coap_resource_t *resource, 
+        coap_address_t *peer, coap_pdu_t *request, str *token,
+        coap_pdu_t *response)
+{     
+  char buf[512] = {0};
+  cJSON *root = NULL;
+  cJSON *item = NULL;
+
+  response->hdr->code = COAP_RESPONSE_CODE(205);
+  if(request != NULL)
+  {
+    printf("get payload data: %s\n", request->data);
+    root = cJSON_Parse(request->data);
+    item = cJSON_GetObjectItem(root, "searchKey");
+    if(!strncmp(item->valuestring, "ANDLINK-DEV", 11)){
+      printf("item->valuestring: %s\n", item->valuestring);
+      response->hdr->code = COAP_RESPONSE_CODE(205);
+      coap_add_option(response, COAP_OPTION_CONTENT_FORMAT,
+        coap_encode_var_bytes(buf, COAP_MEDIATYPE_TEXT_PLAIN), buf);
+      coap_add_data(response, strlen(HELLO), (unsigned char *)HELLO);
+    }
+    else{
+     response->hdr->code = COAP_RESPONSE_CODE(404);
+    }       
+  }
+
 }
 
 #define INDEX "This is a test server made with libcoap (see http://libcoap.sf.net)\n" \
@@ -71,9 +101,10 @@ hnd_get_index(coap_context_t  *ctx, struct coap_resource_t *resource,
 	  coap_encode_var_bytes(buf, 0x2ffff), buf);
     
   coap_add_data(response, strlen(INDEX), (unsigned char *)INDEX);
+
 } 
 
-#define HELLO "Hello world!\n"
+
 void 
 hnd_get_hello(coap_context_t *ctx, struct coap_resource_t *resource,
         coap_address_t *peer, coap_pdu_t *request, str *token, 
@@ -303,6 +334,11 @@ init_resources(coap_context_t *ctx) {
   coap_register_handler(r, COAP_REQUEST_GET, hnd_get_hello);
   coap_add_attr(r, (unsigned char *)"world", 5, (unsigned char *)"0", 1, 0);
   coap_add_resource(ctx, r);
+
+  r = coap_resource_init((unsigned char *)"qlink/searchgw", 14, 0);
+  coap_register_handler(r, COAP_REQUEST_GET, hnd_get_searchgw);
+  coap_add_resource(ctx, r);
+
 
 #ifndef WITHOUT_ASYNC
   r = coap_resource_init((unsigned char *)"async", 5, 0);

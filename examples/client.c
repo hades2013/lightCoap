@@ -126,28 +126,32 @@ int getnetifiphwaddr(const char *ifname, etherAddr_t *hwaddr)
 } 
 
 
-static void create_JSONobjects(void)
+static int create_JSONobjects(void)
 {
 	cJSON *root = NULL;
 	char buffer[512]={0}; 
 	int len;
 
 	root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "searchKey", "ANDLINK-DEVICE");
-    cJSON_AddStringToObject(root,"andlinkVersion", "V2"); 
+  cJSON_AddStringToObject(root, "searchKey", "ANDLINK-DEVICE");
+  cJSON_AddStringToObject(root,"andlinkVersion", "V2"); 
 
-    if (cJSON_PrintPreallocated(root, buffer, sizeof(buffer), 0) != 0) {
-        cJSON_Delete(root);
-        exit(EXIT_FAILURE);
-    }
-    cJSON_Delete(root); 
-  	len = check_segment((unsigned char *)buffer, strlen(buffer));
-  	payload.s = (unsigned char *)coap_malloc(len);
+  memset(buffer, 0 , sizeof(buffer));
+  if (!cJSON_PrintPreallocated(root, buffer, sizeof(buffer), 0)) {
+      printf("this is error!\n");
+      cJSON_Delete(root);
+      return 0;
+  }
+  cJSON_Delete(root); 
+  len = check_segment((unsigned char *)buffer, strlen(buffer));
+  payload.s = (unsigned char *)coap_malloc(len);
  	if (!payload.s)
     	return 0;
 
-  	payload.length = len;
-  	decode_segment((unsigned char *)buffer, strlen(buffer), payload.s);  
+  payload.length = len;
+  decode_segment((unsigned char *)buffer, strlen(buffer), payload.s); 
+  printf("payload : %s\n", payload.s); 
+  return 1;
 }
 
 int
@@ -1015,10 +1019,13 @@ main(int argc, char **argv) {
       wait_seconds = atoi(optarg);
       break;
     case 'e' : 
-      if (!cmdline_input(optarg,&payload))
-	payload.length = 0;
-
-		create_JSONobjects();   
+      //if (!cmdline_input(optarg,&payload))
+	    //   payload.length = 0;
+        if(!strncmp(optarg, "json", 4))
+        { 
+          printf("now go ahead!\n");
+		      create_JSONobjects();   
+        }
       break;
     case 'f' :
       if (!cmdline_input_from_file(optarg,&payload))
