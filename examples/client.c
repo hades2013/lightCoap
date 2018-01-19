@@ -21,7 +21,8 @@
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <netdb.h>
+#include <netdb.h> 
+#include <signal.h>
 
 #include "coap.h"
 #include "cJSON.h" 
@@ -73,6 +74,9 @@ coap_tick_t obs_wait = 0;	/* timeout for current subscription */
 extern int  check_segment(const unsigned char *s, size_t length);
 extern void decode_segment(const unsigned char *seg, size_t length, unsigned char *buf);
 
+void  handle_sigint(int signum) {
+  ready = 1;
+}
 static inline void
 set_timeout(coap_tick_t *timer, const unsigned int seconds) {
   coap_ticks(timer);
@@ -487,7 +491,8 @@ message_handler(struct coap_context_t  *ctx,
   coap_delete_pdu(pdu);
 
   /* our job is done, we can exit at any time */
-  ready = coap_check_option(received, COAP_OPTION_SUBSCRIPTION, &opt_iter) == NULL;
+  if(coap_check_option(received, COAP_OPTION_SUBSCRIPTION, &opt_iter) == NULL)
+      return;
 }
 
 void
@@ -1183,6 +1188,7 @@ main(int argc, char **argv) {
   set_timeout(&max_wait, wait_seconds);
   debug("timeout is set to %d seconds\n", wait_seconds);
 
+  signal(SIGINT, handle_sigint);
   while ( !(ready && coap_can_exit(ctx)) ) {
     FD_ZERO(&readfds);
     FD_SET( ctx->sockfd, &readfds );
