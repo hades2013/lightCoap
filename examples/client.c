@@ -25,6 +25,7 @@
 #include <signal.h>
 
 #include "coap.h"
+#include "resource.h"
 #include "cJSON.h" 
 
 typedef cJSON cJson_t;
@@ -156,6 +157,32 @@ static int create_JSONobjects(void)
   decode_segment((unsigned char *)buffer, strlen(buffer), payload.s); 
   printf("payload : %s\n", payload.s); 
   return 1;
+}
+
+#define HELLO "Hello world!\n"
+void hnd_get_hello(coap_context_t *ctx, struct coap_resource_t *resource,
+        coap_address_t *peer, coap_pdu_t *request, str *token, 
+        coap_pdu_t *response){
+  unsigned char buf[3];
+
+  response->hdr->code = COAP_RESPONSE_CODE(205);
+
+  coap_add_option(response, COAP_OPTION_CONTENT_TYPE,
+    coap_encode_var_bytes(buf, COAP_MEDIATYPE_TEXT_PLAIN), buf);
+
+  coap_add_option(response, COAP_OPTION_MAXAGE, 
+    coap_encode_var_bytes(buf, 0x2ffff) ,buf);
+
+  coap_add_data(response, strlen(HELLO), (unsigned char *)HELLO);
+}
+
+void init_resources(coap_context_t *ctx) {
+  coap_resource_t *r;
+  r = coap_resource_init((unsigned char *)"hello", 5, 0);
+  coap_register_handler(r, COAP_REQUEST_GET, hnd_get_hello);
+  coap_add_attr(r, (unsigned char *)"world", 5, (unsigned char *)"0", 1, 0);
+  coap_add_resource(ctx, r);
+
 }
 
 int
@@ -1187,6 +1214,8 @@ main(int argc, char **argv) {
 
   set_timeout(&max_wait, wait_seconds);
   debug("timeout is set to %d seconds\n", wait_seconds);
+
+  init_resources(ctx);
 
   signal(SIGINT, handle_sigint);
   while ( !(ready && coap_can_exit(ctx)) ) {
